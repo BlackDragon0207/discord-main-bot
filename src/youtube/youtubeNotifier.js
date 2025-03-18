@@ -116,7 +116,7 @@ async function checkLatestVideoAndShorts() {
             console.log("🚨 쇼츠 영상 감지됨!");
             writeJsonFile(SHORTS_INFO_PATH, { lastShortsId: videoId });
             await axios.post(WEBHOOK_URL, {
-                content: `[ <@&${NOTIFICATION_ROLE_ID}> ]\n**흑룡 BLACKDRAGON 채널에 새로운 쇼츠 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/shorts/${videoId}`
+                content: `[ <@&${NOTIFICATION_ROLE_ID}> ]\n\n**흑룡 BLACKDRAGON 채널에 새로운 쇼츠 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/shorts/${videoId}`
             });
             return;
         }
@@ -124,7 +124,7 @@ async function checkLatestVideoAndShorts() {
         console.log("📢 일반 영상 감지됨!");
         writeJsonFile(VIDEO_INFO_PATH, { lastVideoId: videoId });
         await axios.post(WEBHOOK_URL, {
-            content: `[ <@&${NOTIFICATION_ROLE_ID}> ]\n**흑룡 BLACKDRAGON 채널에 새로운 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/watch?v=${videoId}`
+            content: `[ <@&${NOTIFICATION_ROLE_ID}> ]\n\n**흑룡 BLACKDRAGON 채널에 새로운 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/watch?v=${videoId}`
         });
     } catch (error) {
         console.error('❌ 유튜브 영상 확인 중 오류 발생:', error.response?.data || error.message);
