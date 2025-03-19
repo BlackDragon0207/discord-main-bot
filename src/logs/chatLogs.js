@@ -38,11 +38,12 @@ module.exports = function(client) {
     });
 
     // 메시지 삭제 로그
-    client.on('messageDelete', async (message) => {
-        // 메시지가 삭제된 서버가 특정 서버가 아닌 경우 반환
-        if (message.guild.id !== targetGuildId) return;
-
-        if (message.author.bot) return;  // 봇의 메시지는 무시
+    client.on("messageDelete", async (message) => {
+        // 메시지가 존재하지 않으면 함수 종료
+        if (!message) return;
+    
+        // 봇이 보낸 메시지인지 확인 (message.author가 null일 수 있음)
+        if (!message.author || message.author.bot) return;
 
         const logChannel = client.channels.cache.get(chatLogChannelId);
         if (logChannel && logChannel.isTextBased()) {
