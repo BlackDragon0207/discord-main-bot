@@ -3,13 +3,11 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const API_KEYS = process.env.YOUTUBE_API_KEYS.split(','); // 여러 개의 API 키 사용
+const API_KEYS = process.env.YOUTUBE_API_KEYS.split(',');
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const WEBHOOK_URL = process.env.DISCORD_WEBHOOK;
 const VIDEO_INFO_PATH = path.join(__dirname, '../../videoInfo.json');
 const SHORTS_INFO_PATH = path.join(__dirname, '../../shortsInfo.json');
-const NOTIFICATION_ROLE_ID = process.env.NOTIFICATION_ROLE_ID || '1331962732387242025'; // 알림 역할
-
 
 let currentApiKeyIndex = 0;
 
@@ -36,7 +34,9 @@ async function fetchWithRetry(url) {
             }
         }
     }
-    throw new Error('❌ 모든 API 키의 할당량이 초과되었습니다.');
+    console.error('❌ 모든 API 키의 할당량이 초과되었습니다. 10초 후 재시도합니다.');
+    await new Promise(res => setTimeout(res, 10000)); // 10초 대기 후 재시도
+    return fetchWithRetry(url);
 }
 
 function readJsonFile(filePath, defaultValue = {}) {
@@ -62,7 +62,10 @@ async function checkLatestVideoAndShorts() {
     try {
         console.log("🔍 유튜브 최신 영상 검사 중...");
 
-        const searchUrl = `https://www.googleapis.com/youtube/v3/search?key={API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=1`;
+        const prevVideoData = readJsonFile(VIDEO_INFO_PATH, { lastVideoId: null });
+        const prevShortsData = readJsonFile(SHORTS_INFO_PATH, { lastShortsId: null });
+
+        const searchUrl = `https://www.googleapis.com/youtube/v3/search?key={API_KEY}&channelId=${CHANNEL_ID}&part=id,snippet&order=date&maxResults=1`;
         const searchResponse = await fetchWithRetry(searchUrl);
         const video = searchResponse.data.items[0];
 
@@ -71,23 +74,10 @@ async function checkLatestVideoAndShorts() {
         const videoId = video.id.videoId;
         const videoTitle = video.snippet.title;
 
-        const prevVideoData = readJsonFile(VIDEO_INFO_PATH, { lastVideoId: null });
-        const prevShortsData = readJsonFile(SHORTS_INFO_PATH, { lastShortsId: null });
-
         if (prevVideoData.lastVideoId === videoId || prevShortsData.lastShortsId === videoId) {
             console.log("⚠️ 이미 처리된 영상입니다. 알림을 보내지 않습니다.");
             return;
         }
-
-        const getVideoDurationInSeconds = (duration) => {
-            if (!duration) return 0;
-            const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-            if (!match) return 0;
-            const hours = parseInt(match[1] || "0", 10);
-            const minutes = parseInt(match[2] || "0", 10);
-            const seconds = parseInt(match[3] || "0", 10);
-            return hours * 3600 + minutes * 60 + seconds;
-        };
 
         const videoDetailsUrl = `https://www.googleapis.com/youtube/v3/videos?key={API_KEY}&id=${videoId}&part=contentDetails,snippet,liveStreamingDetails`;
         const videoDetailsResponse = await fetchWithRetry(videoDetailsUrl);
@@ -103,7 +93,7 @@ async function checkLatestVideoAndShorts() {
 
         const duration = videoData.contentDetails?.duration || "";
         const videoLength = getVideoDurationInSeconds(duration);
-        
+
         const isShorts = videoLength <= 180 && (
             videoData.snippet.title.toLowerCase().includes("#shorts") || 
             videoData.snippet.description.toLowerCase().includes("#shorts")
@@ -115,19 +105,34 @@ async function checkLatestVideoAndShorts() {
         if (isShorts) {
             console.log("🚨 쇼츠 영상 감지됨!");
             writeJsonFile(SHORTS_INFO_PATH, { lastShortsId: videoId });
-            await axios.post(WEBHOOK_URL, {
-                content: `[ <@&${NOTIFICATION_ROLE_ID}> ]\n\n**흑룡 BLACKDRAGON 채널에 새로운 쇼츠 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/shorts/${videoId}`
-            });
+            await sendDiscordNotification(`**흑룡 BLACKDRAGON 채널에 새로운 쇼츠 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/shorts/${videoId}`);
             return;
         }
 
         console.log("📢 일반 영상 감지됨!");
         writeJsonFile(VIDEO_INFO_PATH, { lastVideoId: videoId });
-        await axios.post(WEBHOOK_URL, {
-            content: `[ <@&${NOTIFICATION_ROLE_ID}> ]\n\n**흑룡 BLACKDRAGON 채널에 새로운 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/watch?v=${videoId}`
-        });
+        await sendDiscordNotification(`**흑룡 BLACKDRAGON 채널에 새로운 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/watch?v=${videoId}`);
+
     } catch (error) {
         console.error('❌ 유튜브 영상 확인 중 오류 발생:', error.response?.data || error.message);
+    }
+}
+
+function getVideoDurationInSeconds(duration) {
+    if (!duration) return 0;
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return 0;
+    const hours = parseInt(match[1] || "0", 10);
+    const minutes = parseInt(match[2] || "0", 10);
+    const seconds = parseInt(match[3] || "0", 10);
+    return hours * 3600 + minutes * 60 + seconds;
+}
+
+async function sendDiscordNotification(message) {
+    try {
+        await axios.post(WEBHOOK_URL, { content: message });
+    } catch (error) {
+        console.error("❌ 디스코드 웹훅 전송 오류:", error.message);
     }
 }
 
