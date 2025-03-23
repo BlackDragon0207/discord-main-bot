@@ -8,7 +8,7 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 const WEBHOOK_URL = process.env.DISCORD_WEBHOOK;
 const VIDEO_INFO_PATH = path.join(__dirname, '../../videoInfo.json');
 const SHORTS_INFO_PATH = path.join(__dirname, '../../shortsInfo.json');
-
+const NOTIFICATION_ROLE_ID = process.env.NOTIFICATION_ROLE_ID || '1331962732387242025'; //
 let currentApiKeyIndex = 0;
 
 function getApiKey() {
@@ -105,13 +105,13 @@ async function checkLatestVideoAndShorts() {
         if (isShorts) {
             console.log("🚨 쇼츠 영상 감지됨!");
             writeJsonFile(SHORTS_INFO_PATH, { lastShortsId: videoId });
-            await sendDiscordNotification(`**흑룡 BLACKDRAGON 채널에 새로운 쇼츠 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/shorts/${videoId}`);
+            await sendDiscordNotification(`[ <@&${NOTIFICATION_ROLE_ID}> ]\n\n**흑룡 BLACKDRAGON 채널에 새로운 쇼츠 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/shorts/${videoId}`);
             return;
         }
 
         console.log("📢 일반 영상 감지됨!");
         writeJsonFile(VIDEO_INFO_PATH, { lastVideoId: videoId });
-        await sendDiscordNotification(`**흑룡 BLACKDRAGON 채널에 새로운 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/watch?v=${videoId}`);
+        await sendDiscordNotification(`[ <@&${NOTIFICATION_ROLE_ID}> ]\n\n**흑룡 BLACKDRAGON 채널에 새로운 영상이 업로드 되었습니다!**\nhttps://www.youtube.com/watch?v=${videoId}`);
 
     } catch (error) {
         console.error('❌ 유튜브 영상 확인 중 오류 발생:', error.response?.data || error.message);
